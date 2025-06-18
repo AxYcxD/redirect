@@ -1,72 +1,54 @@
-from flask import Flask, request, redirect, session, render_template_string
-import requests
-import os
+from flask import Flask, request, render_template_string
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Replace with fixed string if needed
 
-# Replace these or set them as environment variables
-CLIENT_ID = os.getenv("CLIENT_ID", "YOUR_DISCORD_CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET", "YOUR_DISCORD_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "https://yourdomain.com/callback")
-
-DISCORD_API_ENDPOINT = "https://discord.com/api"
-
-HTML_TEMPLATE = """
-<html>
-<head><title>Discord OAuth2</title></head>
+HTML_PAGE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Authorization Complete</title>
+  <style>
+    body {
+      background-color: #0e0e0e;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .box {
+      background: #1c1c1c;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px #00ffff50;
+    }
+    h1 {
+      color: #00ffff;
+    }
+  </style>
+</head>
 <body>
-  {% if user %}
-    <h2>✅ Logged in as {{ user['username'] }}#{{ user['discriminator'] }}</h2>
-    <p><strong>User ID:</strong> {{ user['id'] }}</p>
-    <p><strong>Your IP:</strong> {{ ip }}</p>
-  {% else %}
-    <a href="/login"><button>Login with Discord</button></a>
-  {% endif %}
+  <div class="box">
+    <h1>✅ Authorization Complete</h1>
+    <p>You’ve successfully verified. You may now close this window.</p>
+    {% if code %}
+      <p><strong>OAuth2 Code:</strong> {{ code }}</p>
+    {% endif %}
+  </div>
 </body>
 </html>
 """
 
 @app.route("/")
-def index():
-    user = session.get("user")
-    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    return render_template_string(HTML_TEMPLATE, user=user, ip=ip)
-
-@app.route("/login")
-def login():
-    return redirect(
-        f"{DISCORD_API_ENDPOINT}/oauth2/authorize?client_id={CLIENT_ID}"
-        f"&redirect_uri={REDIRECT_URI}&response_type=code&scope=identify"
-    )
-
-@app.route("/callback")
-def callback():
+def home():
+    # Optional: Show the 'code' param if present (from Discord redirect)
     code = request.args.get("code")
-    if not code:
-        return "Error: no code provided by Discord."
-
-    data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": REDIRECT_URI,
-        "scope": "identify"
-    }
-
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    response = requests.post(f"{DISCORD_API_ENDPOINT}/oauth2/token", data=data, headers=headers)
-    response.raise_for_status()
-
-    access_token = response.json().get("access_token")
-    user_info = requests.get(
-        f"{DISCORD_API_ENDPOINT}/users/@me",
-        headers={"Authorization": f"Bearer {access_token}"}
-    ).json()
-
-    session["user"] = user_info
-    return redirect("/")
+    return render_template_string(HTML_PAGE, code=code)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
